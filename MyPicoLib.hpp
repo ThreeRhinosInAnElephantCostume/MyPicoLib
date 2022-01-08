@@ -486,21 +486,21 @@ public:
 #ifndef _NO_CUSTOM_INTERRUPT
 namespace interrupt
 {
-    std::function<void(uint, uint)> __interrupts[32];
+    inline std::function<void(uint, uint)> __interrupts[32];
     static void interrupt_handler(uint gpio, uint32 events)
     {
         __interrupts[gpio](gpio, events);
     }
-    void set_interrupt(uint gpio, std::function<void(uint, uint)> f, uint mode = GPIO_IRQ_EDGE_RISE)
+    inline void set_interrupt(uint gpio, std::function<void(uint, uint)> f, uint mode = GPIO_IRQ_EDGE_RISE)
     {
         gpio_set_irq_enabled(gpio, mode, true);
         __interrupts[gpio] = f;
     }
-    void set_interrupt(uint gpio, std::function<void()> f, uint mode = GPIO_IRQ_EDGE_RISE)
+    inline void set_interrupt(uint gpio, std::function<void()> f, uint mode = GPIO_IRQ_EDGE_RISE)
     {
         set_interrupt(gpio, [&](uint, uint) {f();}, mode);
     }
-    void init_interrupts()
+    inline void init_interrupts()
     {
         gpio_set_irq_enabled_with_callback(0, GPIO_IRQ_EDGE_RISE, true, interrupt_handler);
         gpio_set_irq_enabled(0, GPIO_IRQ_EDGE_RISE, false);
