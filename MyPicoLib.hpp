@@ -85,21 +85,21 @@ inline uint64 gettime()
     return to_us_since_boot(get_absolute_time());
 }
 #ifdef _HARDWARE_I2C_H
-template<uint8 ADDRESS>
 struct I2C_DEVICE
 {
     decltype(i2c0) I2C_PORT;
     uint PIN_SDA;
     uint PIN_SCL;
     uint datarate;
+    uint8 address;
     void read_registers(uint8 reg, uint8* buf, uint8 len)
     {
         // for(uint i = 0; i < len; i++)
         // {
         //     buf[i] = read_register(reg+i);
         // }
-        i2c_write_blocking(I2C_PORT, ADDRESS, &reg, 1, true);   
-        i2c_read_blocking(I2C_PORT, ADDRESS, buf, len, false);
+        i2c_write_blocking(I2C_PORT, address, &reg, 1, true);   
+        i2c_read_blocking(I2C_PORT, address, buf, len, false);
     }
     uint8* read_registers(uint8 reg, uint8 len)
     {
@@ -110,29 +110,29 @@ struct I2C_DEVICE
     uint read_register_32(uint8 reg)
     {
         uint dt;
-        i2c_write_blocking(I2C_PORT, ADDRESS, &reg, 1, true);   
-        i2c_read_blocking(I2C_PORT, ADDRESS, (uint8*)&dt, 4, false);
+        i2c_write_blocking(I2C_PORT, address, &reg, 1, true);   
+        i2c_read_blocking(I2C_PORT, address, (uint8*)&dt, 4, false);
         return dt;
     }
     uint16 read_register_16(uint8 reg)
     {
         uint16 dt;
-        i2c_write_blocking(I2C_PORT, ADDRESS, &reg, 1, true);   
-        i2c_read_blocking(I2C_PORT, ADDRESS, (uint8*)&dt, 2, false);
+        i2c_write_blocking(I2C_PORT, address, &reg, 1, true);   
+        i2c_read_blocking(I2C_PORT, address, (uint8*)&dt, 2, false);
         return dt;
     }
     uint8 read_register(uint8 reg)
     {
         uint8 dt;
-        i2c_write_blocking(I2C_PORT, ADDRESS, &reg, 1, true);   
-        i2c_read_blocking(I2C_PORT, ADDRESS, &dt, 1, false);
+        i2c_write_blocking(I2C_PORT, address, &reg, 1, true);   
+        i2c_read_blocking(I2C_PORT, address, &dt, 1, false);
         //i2c_read_raw_blocking(I2C_PORT, &dt, 1);
         return dt;
     }
     void write_registers(uint8 reg, uint8* dt, uint8 len)
     {
-        i2c_write_blocking(I2C_PORT, ADDRESS, &reg, 1, true);   
-        i2c_write_blocking(I2C_PORT, ADDRESS, dt, len, false);   
+        i2c_write_blocking(I2C_PORT, address, &reg, 1, true);   
+        i2c_write_blocking(I2C_PORT, address, dt, len, false);   
     }
     void write_register(uint8 reg, uint8* dt, uint8 len = 1)
     {
@@ -141,7 +141,23 @@ struct I2C_DEVICE
     void write_register(uint8 reg, uint8 dt)
     {
         uint8 rd[] = {reg, dt};
-        i2c_write_blocking(I2C_PORT, ADDRESS, rd, 2, false); 
+        i2c_write_blocking(I2C_PORT, address, rd, 2, false); 
+    }
+    void write_register16(uint8 reg, uint16 dt)
+    {
+        uint8* dtp = (uint8*)&dt;
+        uint8 rd[] = {reg, dtp[0], dtp[1]};
+        i2c_write_blocking(I2C_PORT, address, rd, 3, false); 
+    }
+    void write_register32(uint8 reg, uint32 dt)
+    {
+        uint8* dtp = (uint8*)&dt;
+        uint8 rd[] = {reg, dtp[0], dtp[1], dtp[2], dtp[3]};
+        i2c_write_blocking(I2C_PORT, address, rd, 5, false); 
+    }
+    void write_raw(uint8* dt, uint8 len)
+    {
+        i2c_write_blocking(I2C_PORT, address, dt, len, false);
     }
     uint8 modify_register(uint8 reg, uint8 val, uint8 mask)
     {
@@ -166,12 +182,13 @@ struct I2C_DEVICE
         gpio_pull_up(PIN_SDA);
         gpio_pull_up(PIN_SCL);
     }   
-    I2C_DEVICE(decltype(i2c0) I2C_PORT, uint PIN_SDA, uint PIN_SCL, uint datarate, bool autoinit=true)
+    I2C_DEVICE(decltype(i2c0) I2C_PORT, uint8 address, uint8 PIN_SDA, uint8 PIN_SCL, uint8 datarate, bool autoinit=true)
     {
         this->PIN_SDA = PIN_SDA;
         this->PIN_SCL = PIN_SCL;
         this->datarate = datarate;
         this->I2C_PORT = I2C_PORT;
+        this->address = address;
         if(autoinit)
             i2cdeviceinit();
     }
@@ -518,3 +535,20 @@ inline T ComputeR2(T R1, T Vin, T Vout)
 {
     return R1 * (1 / ((Vin/Vout)-1));
 }
+
+struct HardwareFailureException : std::exception
+{
+    std::string msg = "";
+    HardwareFailureException() _GLIBCXX_NOTHROW 
+    { 
+
+    }
+    HardwareFailureException(std::string msg) 
+    { 
+        this->msg = msg;
+    }
+    virtual const char* what() const _GLIBCXX_TXN_SAFE_DYN _GLIBCXX_NOTHROW
+    {
+        return msg.c_str();
+    }
+};
