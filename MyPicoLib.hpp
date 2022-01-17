@@ -182,7 +182,7 @@ struct I2C_DEVICE
         gpio_pull_up(PIN_SDA);
         gpio_pull_up(PIN_SCL);
     }   
-    I2C_DEVICE(decltype(i2c0) I2C_PORT, uint8 address, uint8 PIN_SDA, uint8 PIN_SCL, uint8 datarate, bool autoinit=true)
+    I2C_DEVICE(decltype(i2c0) I2C_PORT, uint8 address, uint8 PIN_SDA, uint8 PIN_SCL, uint32 datarate, bool autoinit=true)
     {
         this->PIN_SDA = PIN_SDA;
         this->PIN_SCL = PIN_SCL;
@@ -504,23 +504,38 @@ public:
 namespace interrupt
 {
     inline std::function<void(uint, uint)> __interrupts[32];
+    inline bool __enabled = false;
+    inline std::function<void(uint, uint)> __null_interrupt = [](uint, uint){};
     static void interrupt_handler(uint gpio, uint32 events)
     {
         __interrupts[gpio](gpio, events);
     }
+    inline void init_interrupts()
+    {
+        __enabled = true;
+        for(int i = 0; i < ArraySize(__interrupts); i++)
+        {
+            __interrupts[i] = __null_interrupt;
+        }
+        gpio_set_irq_enabled_with_callback(0, GPIO_IRQ_EDGE_RISE, true, interrupt_handler);
+        gpio_set_irq_enabled(0, GPIO_IRQ_EDGE_RISE, false);
+    }
     inline void set_interrupt(uint gpio, std::function<void(uint, uint)> f, uint mode = GPIO_IRQ_EDGE_RISE)
     {
+        if(!__enabled)
+            init_interrupts();
         gpio_set_irq_enabled(gpio, mode, true);
         __interrupts[gpio] = f;
     }
     inline void set_interrupt(uint gpio, std::function<void()> f, uint mode = GPIO_IRQ_EDGE_RISE)
     {
+        if(!__enabled)
+            init_interrupts();
         set_interrupt(gpio, [&](uint, uint) {f();}, mode);
     }
-    inline void init_interrupts()
+    inline void disable_interrupt(uint gpio)
     {
-        gpio_set_irq_enabled_with_callback(0, GPIO_IRQ_EDGE_RISE, true, interrupt_handler);
-        gpio_set_irq_enabled(0, GPIO_IRQ_EDGE_RISE, false);
+        set_interrupt(gpio, __null_interrupt);
     }
 }
 #endif
