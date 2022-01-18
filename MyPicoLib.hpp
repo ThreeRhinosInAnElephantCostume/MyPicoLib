@@ -9,6 +9,7 @@
 #include <deque>
 #include <functional>
 #include <cstring>
+#include <atomic>
 #include <unordered_map>
 
 using byte = uint8_t;
@@ -80,9 +81,29 @@ inline bool is_pin_used(uint pin)
     return !is_pin_unused(pin);
 }
 
-inline uint64 gettime()
+inline uint64 get_time_us()
 {
     return to_us_since_boot(get_absolute_time());
+}
+inline uint64 get_time_ms()
+{
+    return get_time_us()/1000;
+}
+inline uint32 get_time_s()
+{
+    return get_time_ms()/1000;
+}
+inline double get_time_us_real()
+{
+    return (double)get_time_us();
+}
+inline double get_time_ms_real()
+{
+    return get_time_us_real()/1000.0;
+}
+inline double get_time_s_real()
+{
+    return get_time_ms_real()/1000.0;
 }
 #ifdef _HARDWARE_I2C_H
 struct I2C_DEVICE
@@ -531,7 +552,7 @@ namespace interrupt
     {
         if(!__enabled)
             init_interrupts();
-        set_interrupt(gpio, [&](uint, uint) {f();}, mode);
+        set_interrupt(gpio, [f, mode](uint, uint) {f();}, mode);
     }
     inline void disable_interrupt(uint gpio)
     {
@@ -567,3 +588,14 @@ struct HardwareFailureException : std::exception
         return msg.c_str();
     }
 };
+
+template<typename T>
+inline T InterruptSafeCopy(T& v)
+{
+    std::atomic<T> ret;
+    do
+    {
+        ret = v;
+    }while(ret != v);
+    return ret;
+}
